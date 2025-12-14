@@ -1,70 +1,79 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 import express from 'express';
-
 import dotenv from 'dotenv';
 import cors from 'cors';
 import connectDB from './config/db.js';
 
-// Load env vars
+// Resolve __dirname (ESM fix)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load env variables
 dotenv.config();
 
-// Connect to database
+// Connect MongoDB
 connectDB();
-
-// Import routes
-import authRoutes from './routes/auth.js';
-import propertyRoutes from './routes/properties.js';
 
 const app = express();
 
-// Body parser
+/* =========================
+   Middleware
+========================= */
+
+// Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Enable CORS
+// CORS (FIXED for Netlify + Localhost)
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: [
+      'http://localhost:5173',
+      'https://estatehub-live.netlify.app',
+    ],
     credentials: true,
   })
 );
 
-// Mount routes
+/* =========================
+   Routes
+========================= */
+
+import authRoutes from './routes/auth.js';
+import propertyRoutes from './routes/properties.js';
+
 app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
 
-// Root route
+// Static uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Root route (health check)
 app.get('/', (req, res) => {
   res.json({
-    message: '🏠 EstateHub API is running!',
-    version: '1.0.0',
-    endpoints: {
-      auth: '/api/auth',
-      properties: '/api/properties',
-    },
+    success: true,
+    message: '🏠 EstateHub API is running',
+    environment: process.env.NODE_ENV || 'development',
   });
 });
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-
-// Error handler
+/* =========================
+   Error Handler
+========================= */
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('❌ Error:', err.message);
   res.status(500).json({
     success: false,
     message: err.message || 'Server Error',
   });
 });
 
+/* =========================
+   Server
+========================= */
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📡 Frontend URL: ${process.env.FRONTEND_URL}`);
 });
